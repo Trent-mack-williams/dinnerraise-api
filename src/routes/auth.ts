@@ -10,6 +10,9 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 // env gives us the JWT_SECRET from .env
 import { env } from "../config/env";
+// checks login tokens by reading the Authorization: Bearer <token> header, Verifing the token’s signature with JWT_SECRET, 
+// and Attaching the user’s id and role to the request, or rejects the call with a 401.
+import { requireAuth } from "../middleware/requireAuth";
 
 // A Router is a mini-app for a group of related URLs. We'll mount it under /auth
 export const authRouter = Router();
@@ -180,4 +183,20 @@ authRouter.post("/login", async (req, res) => {
     token,
     user: { id: user.id, email: user.email, role: user.role },
   });
+});
+
+// GET /auth/me
+// Protected: requireAuth runs first and rejects the request if the token is bad
+authRouter.get("/me", requireAuth, async (req, res) => {
+  // requireAuth has already put the user's id on req.user
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { id: true, email: true, role: true, firstName: true, lastName: true },
+  });
+
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  return res.status(200).json({ user });
 });
