@@ -45,4 +45,4 @@ node_modules/ holds the downloaded libraries. It’s large and never edited by h
 node_modules/@prisma/client/ (generated) is the database toolkit Prisma wrote from your schema. It gives your code typed functions like prisma.user.create.
 
 //////// Run this to bring up data base /////////
-npm run db:studio
+npm run db:studio 
