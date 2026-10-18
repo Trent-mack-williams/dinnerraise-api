@@ -43,3 +43,47 @@ eventsRouter.post("/", requireAuth, requireRole("HOST"), async (req, res) => {
 
   return res.status(201).json({ event });
 });
+
+// GET /events/mine
+// Protected and host-only. Returns only the events this host created.
+// Must sit above "/:id" so Express doesn't read "mine" as an id
+eventsRouter.get("/mine", requireAuth, requireRole("HOST"), async (req, res) => {
+  const events = await prisma.event.findMany({
+    where: { hostId: req.user!.id },   // Filter to this host only
+    orderBy: { startsAt: "asc" },      // Soonest event first
+  });
+
+  return res.status(200).json({ events });
+});
+
+// GET /events/:id
+// Public. Anyone with the link can see the event's details.
+// ":id" is a route parameter: the value in the URL is available as req.params.id
+eventsRouter.get("/:id", async (req, res) => {
+  const event = await prisma.event.findUnique({
+    where: { id: req.params.id },
+    // Only the fields a guest needs. Notice hostId is left out
+    select: {
+      id: true,
+      title: true,
+      cause: true,
+      description: true,
+      location: true,
+      startsAt: true,
+      seatPriceCents: true,
+      capacity: true,
+      // Count confirmed seats so the page can show "seats left"
+      _count: { select: { seats: { where: { status: "CONFIRMED" } } } },
+    },
+  });
+
+  if (!event) {
+    return res.status(404).json({ error: "Event not found" });
+  }
+
+  // Calculate seats remaining. We never store this number; it's always derived
+  const { _count, ...details } = event;
+  return res.status(200).json({
+    event: { ...details, seatsRemaining: event.capacity - _count.seats },
+  });
+});
