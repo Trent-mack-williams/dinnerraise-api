@@ -6,6 +6,10 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 // bcrypt hashes passwords so the originals are never stored
 import bcrypt from "bcrypt";
+// jwt creates and verifies signed login tokens
+import jwt from "jsonwebtoken";
+// env gives us the JWT_SECRET from .env
+import { env } from "../config/env";
 
 // A Router is a mini-app for a group of related URLs. We'll mount it under /auth
 export const authRouter = Router();
@@ -128,4 +132,52 @@ authRouter.post("/host-password", async (req, res) => {
   });
 
   return res.status(200).json({ message: "Password set" });
+});
+
+// Schema for login: an email and a password
+const loginSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(1, "Password is required"),
+});
+
+// POST /auth/login
+// Checks the email and password, then returns a signed token
+authRouter.post("/login", async (req, res) => {
+  const parsed = loginSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: parsed.error.issues[0]?.message ?? "Invalid input",
+    });
+  }
+
+  const { email, password } = parsed.data;
+
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  // Use the same generic message for "no such user" and "wrong password".
+  // This stops attackers learning which emails have accounts
+  const invalid = { error: "Invalid email or password" };
+
+  if (!user || !user.passwordHash) {
+    return res.status(401).json(invalid);
+  }
+
+  // bcrypt.compare hashes the typed password the same way and compares the results
+  const matches = await bcrypt.compare(password, user.passwordHash);
+  if (!matches) {
+    return res.status(401).json(invalid);
+  }
+
+  // Create a token containing the user's id and role, valid for 7 days
+  const token = jwt.sign(
+    { sub: user.id, role: user.role },
+    env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+
+  return res.status(200).json({
+    token,
+    user: { id: user.id, email: user.email, role: user.role },
+  });
 });
