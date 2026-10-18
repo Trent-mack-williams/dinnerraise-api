@@ -4,6 +4,8 @@ import { Router } from "express";
 import { z } from "zod";
 // Our shared database connection
 import { prisma } from "../lib/prisma";
+// bcrypt hashes passwords so the originals are never stored
+import bcrypt from "bcrypt";
 
 // A Router is a mini-app for a group of related URLs. We'll mount it under /auth
 export const authRouter = Router();
@@ -52,4 +54,78 @@ authRouter.post("/guest-email", async (req, res) => {
       role: user.role,
     },
   });
+});
+
+// POST /auth/host-email
+// Creates a host account. The password is set in the next step, via /auth/host-password
+authRouter.post("/host-email", async (req, res) => {
+  // Reuse the same email validation rules as guests
+  const parsed = guestEmailSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: parsed.error.issues[0]?.message ?? "Invalid input",
+    });
+  }
+
+  const { email } = parsed.data;
+
+  // Look for an existing account with this email
+  const existing = await prisma.user.findUnique({ where: { email } });
+
+  // An existing guest can't become a host just by entering their email.
+  // We reject it to keep roles clear; in practice this is handled in a later step
+  if (existing && existing.role !== "HOST") {
+    return res.status(409).json({
+      error: "This email is already registered as a guest",
+    });
+  }
+
+  // If a host account already exists, return it. Otherwise create one with no password yet
+  const user =
+    existing ??
+    (await prisma.user.create({
+      data: { email, role: "HOST" },
+    }));
+
+  return res.status(200).json({
+    user: { id: user.id, email: user.email, role: user.role },
+  });
+});
+// Schema for the password step: at least 8 characters, matching the design
+const passwordSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+// POST /auth/host-password
+// Sets a password on an existing host account
+authRouter.post("/host-password", async (req, res) => {
+  const parsed = passwordSchema.safeParse(req.body);
+
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: parsed.error.issues[0]?.message ?? "Invalid input",
+    });
+  }
+
+  const { email, password } = parsed.data;
+
+  // The host must already exist from the host-email step
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  if (!user || user.role !== "HOST") {
+    return res.status(404).json({ error: "Host account not found" });
+  }
+
+  // Turn the password into a hash. The "10" is the cost factor: higher is slower, and harder for attackers
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  // Save only the hash
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash },
+  });
+
+  return res.status(200).json({ message: "Password set" });
 });
