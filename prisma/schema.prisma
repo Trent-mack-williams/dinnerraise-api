@@ -15,9 +15,12 @@ enum UserRole {
   GUEST
 }
 
+// Seat lifecycle. Only CONFIRMED seats count against capacity
 enum SeatStatus {
-  CONFIRMED
-  CANCELLED
+  PENDING     // Guest requested a seat; host hasn't responded yet
+  CONFIRMED   // Approved, or booked via a valid invite
+  DECLINED    // Host turned the request down
+  CANCELLED   // Cancelled after confirmation
 }
 
 // A person. Hosts and guests both live here, distinguished by role
@@ -49,6 +52,7 @@ model Event {
   createdAt      DateTime @default(now())
 
   seats          Seat[]
+  invitations    Invitation[]
 
   @@index([hostId])       // Speeds up "find this host's events"
 }
@@ -66,6 +70,22 @@ model Seat {
   status                SeatStatus @default(CONFIRMED)
   stripePaymentIntentId String?    @unique  // Links this seat to its Stripe payment
   createdAt             DateTime   @default(now())
+  invitationId String?     // Set when the seat was booked via an invite
+  invitation   Invitation? @relation(fields: [invitationId], references: [id])
 
   @@index([eventId, status])  // Speeds up "count confirmed seats for this event"
+}
+
+// An invitation sent by a host. Holding its token proves the guest was invited
+model Invitation {
+  id          String    @id @default(cuid())
+  eventId     String
+  event       Event     @relation(fields: [eventId], references: [id])
+  guestEmail  String
+  token       String    @unique            // Random secret sent in the invite link
+  usedAt      DateTime?                    // Set once the guest has confirmed their seat
+  createdAt   DateTime  @default(now())
+  seats       Seat[]
+
+  @@index([eventId])
 }
