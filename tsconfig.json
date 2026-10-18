@@ -1,0 +1,20 @@
+// target: the JavaScript version to produce. ES2022 is modern and fully supported by Node.
+// module: how files load each other. commonjs is what Node uses by default.
+// outDir: compiled JavaScript goes into dist/.
+// rootDir: your TypeScript source lives in src/.
+// strict: turns on strict type checking. Keep it on; it catches bugs early.
+// esModuleInterop: lets you write import express from "express".
+// skipLibCheck: skips checking library type files, which speeds things up.
+// include: only compile files inside src/.
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,71 @@
+// Generates the client library your code imports from "@prisma/client"
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Which database to use. The URL is read from your .env file
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// A fixed list of allowed values. Prevents typos like "Hosst"
+enum UserRole {
+  HOST
+  GUEST
+}
+
+enum SeatStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+// A person. Hosts and guests both live here, distinguished by role
+model User {
+  id           String   @id @default(cuid())  // Unique ID, generated automatically
+  email        String   @unique               // No two users can share an email
+  passwordHash String?                        // ? means optional. Guests may not have one
+  firstName    String?
+  lastName     String?
+  role         UserRole
+  createdAt    DateTime @default(now())
+
+  hostedEvents Event[]  // One user can host many events
+  seats        Seat[]   // One user can hold many seats
+}
+
+// A fundraising dinner created by a host
+model Event {
+  id             String   @id @default(cuid())
+  hostId         String                       // The id of the host's User row
+  host           User     @relation(fields: [hostId], references: [id])
+  title          String
+  cause          String?
+  description    String?
+  location       String
+  startsAt       DateTime
+  seatPriceCents Int      // Money in whole pence/cents. £19.99 is stored as 1999
+  capacity       Int      // Maximum number of seats
+  createdAt      DateTime @default(now())
+
+  seats          Seat[]
+
+  @@index([hostId])       // Speeds up "find this host's events"
+}
+
+// A seat booked by a guest at an event
+model Seat {
+  id                    String     @id @default(cuid())
+  eventId               String
+  event                 Event      @relation(fields: [eventId], references: [id])
+  userId                String?    // Null if the guest booked without an account
+  user                  User?      @relation(fields: [userId], references: [id])
+  guestEmail            String
+  guestName             String
+  dietaryRestrictions   String[]   // A list, e.g. ["vegan", "no nuts"]
+  status                SeatStatus @default(CONFIRMED)
+  stripePaymentIntentId String?    @unique  // Links this seat to its Stripe payment
+  createdAt             DateTime   @default(now())
+
+  @@index([eventId, status])  // Speeds up "count confirmed seats for this event"
+}
