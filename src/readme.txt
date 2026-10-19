@@ -49,3 +49,6 @@ npm run db:studio
 
 /////// Run this to log in ///////////
 $login = Invoke-RestMethod -Method Post -Uri http://localhost:4000/auth/login -ContentType "application/json" -Body '{"email":"host@example.com","password":"secret123"}'
+
+////// Check you are loged in ////////
+$login.user
