@@ -46,3 +46,6 @@ node_modules/@prisma/client/ (generated) is the database toolkit Prisma wrote fr
 
 //////// Run this to bring up data base /////////
 npm run db:studio 
+
+/////// Run this to log in ///////////
+$login = Invoke-RestMethod -Method Post -Uri http://localhost:4000/auth/login -ContentType "application/json" -Body '{"email":"host@example.com","password":"secret123"}'
