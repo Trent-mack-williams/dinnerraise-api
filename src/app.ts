@@ -4,6 +4,7 @@ import { authRouter } from "./routes/auth";
 import { eventsRouter } from "./routes/events";
 import { invitationsRouter } from "./routes/invitations";
 import { seatsRouter } from "./routes/seats";
+import { paymentsRouter } from "./routes/payments";
 
 export function createApp() {
   const app = express();
@@ -20,6 +21,7 @@ export function createApp() {
   app.use("/events", eventsRouter);
   app.use("/invitations", invitationsRouter);
   app.use("/seats", seatsRouter);
+  app.use("/payments", paymentsRouter);
 
   return app;
 }

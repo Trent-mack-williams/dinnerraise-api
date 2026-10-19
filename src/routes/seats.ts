@@ -41,7 +41,7 @@ seatsRouter.patch("/:seatId", requireAuth, requireRole("HOST"), async (req, res)
 
       return tx.seat.update({
         where: { id: existing.id },
-        data: { status: parsed.data.status },
+        data: { status: parsed.data.status === "CONFIRMED" ? "AWAITING_PAYMENT" : "DECLINED" },
       });
     });
 

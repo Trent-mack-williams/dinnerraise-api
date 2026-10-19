@@ -21,6 +21,7 @@ enum SeatStatus {
   CONFIRMED   // Approved, or booked via a valid invite
   DECLINED    // Host turned the request down
   CANCELLED   // Cancelled after confirmation
+  AWAITING_PAYMENT  // Approved or invited, waiting for Stripe to confirm payment
 }
 
 // A person. Hosts and guests both live here, distinguished by role
@@ -69,6 +70,7 @@ model Seat {
   dietaryRestrictions   String[]   // A list, e.g. ["vegan", "no nuts"]
   status                SeatStatus @default(CONFIRMED)
   stripePaymentIntentId String?    @unique  // Links this seat to its Stripe payment
+  stripeSessionId      String?    @unique  // The Stripe Checkout session this seat is paying through
   createdAt             DateTime   @default(now())
   invitationId String?     // Set when the seat was booked via an invite
   invitation   Invitation? @relation(fields: [invitationId], references: [id])
