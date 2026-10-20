@@ -33,8 +33,9 @@ seatsRouter.patch("/:seatId", requireAuth, requireRole("HOST"), async (req, res)
 
       // Capacity is only checked when approving. Declining frees nothing
       if (parsed.data.status === "CONFIRMED") {
+        // Seats awaiting payment also hold a place, so count them too
         const confirmed = await tx.seat.count({
-          where: { eventId: existing.eventId, status: "CONFIRMED" },
+          where: { eventId: existing.eventId, status: { in: ["CONFIRMED", "AWAITING_PAYMENT"] } },
         });
         if (confirmed >= existing.event.capacity) throw new Error("EVENT_FULL");
       }

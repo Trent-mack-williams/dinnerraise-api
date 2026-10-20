@@ -74,7 +74,7 @@ eventsRouter.get("/:id", async (req, res) => {
       seatPriceCents: true,
       capacity: true,
       // Count confirmed seats so the page can show "seats left"
-      _count: { select: { seats: { where: { status: "CONFIRMED" } } } },
+      _count: { select: { seats: { where: { status: { in: ["CONFIRMED", "AWAITING_PAYMENT"] } } } } },
     },
   });
 

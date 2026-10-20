@@ -30,8 +30,9 @@ invitationsRouter.post("/:token/confirm", async (req, res) => {
       if (!invitation) throw new Error("INVALID_TOKEN");
       if (invitation.usedAt) throw new Error("ALREADY_USED");
 
+       // Count seats awaiting payment too, so they reserve a place
       const confirmed = await tx.seat.count({
-        where: { eventId: invitation.eventId, status: "CONFIRMED" },
+        where: { eventId: invitation.eventId, status: { in: ["CONFIRMED", "AWAITING_PAYMENT"] } },
       });
       if (confirmed >= invitation.event.capacity) throw new Error("EVENT_FULL");
 

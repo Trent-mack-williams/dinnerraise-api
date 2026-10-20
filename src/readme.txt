@@ -47,8 +47,40 @@ node_modules/@prisma/client/ (generated) is the database toolkit Prisma wrote fr
 //////// Run this to bring up data base /////////
 npm run db:studio 
 
-/////// Run this to log in ///////////
+///// Get strip up and running locally ////
+stripe listen --events checkout.session.completed --forward-to localhost:4000/webhooks/stripe
+
+
+
+
+# Log in as the host and store the token in $login
 $login = Invoke-RestMethod -Method Post -Uri http://localhost:4000/auth/login -ContentType "application/json" -Body '{"email":"host@example.com","password":"secret123"}'
 
-////// Check you are loged in ////////
+# Check you are loged in
 $login.user
+
+# Build the event details as a PowerShell hashtable, then convert to JSON text
+$body = @{ title = "Capacity Test"; location = "4 Test Street, London"; startsAt = "2027-09-01T19:00:00Z"; seatPriceCents = 2500; capacity = 1 } | ConvertTo-Json
+
+# Create the event and keep just the event object (the .event part of the response)
+$event = (Invoke-RestMethod -Method Post -Uri http://localhost:4000/events -ContentType "application/json" -Headers @{ Authorization = "Bearer $($login.token)" } -Body $body).event
+
+# Guest one requests a seat
+$b1 = @{ guestName = "Jo"; guestEmail = "jo@example.com"; dietaryRestrictions = @() } | ConvertTo-Json
+$req1 = Invoke-RestMethod -Method Post -Uri "http://localhost:4000/events/$($event.id)/seats" -ContentType "application/json" -Body $b1
+
+# Guest two requests a seat
+$b2 = @{ guestName = "Lee"; guestEmail = "lee@example.com"; dietaryRestrictions = @() } | ConvertTo-Json
+$req2 = Invoke-RestMethod -Method Post -Uri "http://localhost:4000/events/$($event.id)/seats" -ContentType "application/json" -Body $b2
+
+# Step 2 check: the public view should show seats remaining
+Invoke-RestMethod -Uri "http://localhost:4000/events/$($event.id)" | ConvertTo-Json -Depth 5
+
+# Host approves Jo. Seat moves to AWAITING_PAYMENT
+$d = @{ status = "CONFIRMED" } | ConvertTo-Json
+Invoke-RestMethod -Method Patch -Uri "http://localhost:4000/seats/$($req1.seat.id)" -ContentType "application/json" -Headers @{ Authorization = "Bearer $($login.token)" } -Body $d
+
+# Check the public view again: seatsRemaining should now be 0
+Invoke-RestMethod -Uri "http://localhost:4000/events/$($event.id)" | ConvertTo-Json -Depth 5
+
+
