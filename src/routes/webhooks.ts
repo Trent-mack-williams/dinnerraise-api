@@ -37,6 +37,20 @@ webhooksRouter.post("/stripe", raw({ type: "application/json" }), async (req, re
     }
   }
 
+  // checkout.session.expired fires when a guest doesn't pay in time
+  if (event.type === "checkout.session.expired") {
+    const session = event.data.object;
+    const seatId = session.metadata?.seatId;
+
+    if (seatId) {
+      // Cancel the seat, freeing its place. If it's already CONFIRMED, don't touch it
+      await prisma.seat.updateMany({
+        where: { id: seatId, status: "AWAITING_PAYMENT" },
+        data: { status: "CANCELLED" },
+      });
+    }
+  }
+
   // Always acknowledge receipt, or Stripe will keep retrying
   return res.status(200).json({ received: true });
 });

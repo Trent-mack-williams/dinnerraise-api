@@ -37,6 +37,7 @@ paymentsRouter.post("/checkout/:seatId", async (req, res) => {
     ],
     // Stripe puts this id in the webhook, so we know which seat was paid for
     metadata: { seatId: seat.id },
+    expires_at: Math.floor(Date.now() / 1000) + 30 * 60, // 30 minutes from now, in Unix seconds then then session expeire and the seat is no longer reserved
     success_url: "http://localhost:3000/payment/success",
     cancel_url: "http://localhost:3000/payment/cancelled",
   });
