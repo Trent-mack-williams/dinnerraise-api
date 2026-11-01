@@ -100,12 +100,14 @@ eventsRouter.get("/:id", async (req, res) => {
     return res.status(404).json({ error: "Event not found" });
   }
 
-  // Private events are visible only to the host and to invited guests
+  // Private events are visible only to the host and to holders of a valid invite
   if (event.isPrivate) {
     const viewer = await getOptionalViewer(req);
-    const invited = viewer
+    const inviteToken = typeof req.query.invite === "string" ? req.query.invite : null;
+
+    const invited = inviteToken
       ? await prisma.invitation.findFirst({
-          where: { eventId: event.id, guestEmail: viewer.email },
+          where: { eventId: event.id, token: inviteToken },
         })
       : null;
     const isHost = viewer?.id === event.hostId;
@@ -210,11 +212,9 @@ eventsRouter.post("/:id/invitations", requireAuth, requireRole("HOST"), async (r
     data: { eventId: event.id, guestEmail: parsed.data.guestEmail, token },
   });
 
+  const link = `http://localhost:3000/invite/${invitation.token}`;
   return res.status(201).json({
-    invitation: {
-      id: invitation.id,
-      guestEmail: invitation.guestEmail,
-      link: `http://localhost:3000/invite/${token}`,
-    },
+    invitation: { id: invitation.id, guestEmail: invitation.guestEmail, token: invitation.token, link },
   });
+  
 });
