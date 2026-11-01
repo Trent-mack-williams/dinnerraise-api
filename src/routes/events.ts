@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
+import { getOptionalViewer } from "../lib/viewer";
 
 export const eventsRouter = Router();
 
@@ -21,6 +22,8 @@ const createEventSchema = z.object({
   seatPriceCents: z.number().int().min(0, "Price cannot be negative"),
   // At least one seat, and whole numbers only
   capacity: z.number().int().min(1, "Capacity must be at least 1"),
+
+  isPrivate: z.boolean().default(false),
 });
 
 // POST /events
@@ -38,6 +41,7 @@ eventsRouter.post("/", requireAuth, requireRole("HOST"), async (req, res) => {
   const event = await prisma.event.create({
     data: {
       ...parsed.data,
+      isPrivate: parsed.data.isPrivate,
       hostId: req.user!.id,
     },
   });
@@ -61,7 +65,7 @@ eventsRouter.get("/mine", requireAuth, requireRole("HOST"), async (req, res) => 
 // Public. Lists upcoming events with seats still available
 eventsRouter.get("/", async (_req, res) => {
   const events = await prisma.event.findMany({
-    where: { startsAt: { gte: new Date() } }, // only events in the future
+    where: { startsAt: { gte: new Date() }, isPrivate: false }, // only events in the future and which are not private
     orderBy: { startsAt: "asc" },            // soonest first
     include: {
       _count: {
@@ -85,18 +89,10 @@ eventsRouter.get("/", async (_req, res) => {
 eventsRouter.get("/:id", async (req, res) => {
   const event = await prisma.event.findUnique({
     where: { id: req.params.id },
-    // Only the fields a guest needs. Notice hostId is left out
-    select: {
-      id: true,
-      title: true,
-      cause: true,
-      description: true,
-      location: true,
-      startsAt: true,
-      seatPriceCents: true,
-      capacity: true,
-      // Count confirmed seats so the page can show "seats left"
-      _count: { select: { seats: { where: { status: { in: ["CONFIRMED", "AWAITING_PAYMENT"] } } } } },
+    include: {
+      _count: {
+        select: { seats: { where: { status: { in: ["CONFIRMED", "AWAITING_PAYMENT"] } } } },
+      },
     },
   });
 
@@ -104,10 +100,25 @@ eventsRouter.get("/:id", async (req, res) => {
     return res.status(404).json({ error: "Event not found" });
   }
 
-  // Calculate seats remaining. We never store this number; it's always derived
-  const { _count, ...details } = event;
+  // Private events are visible only to the host and to invited guests
+  if (event.isPrivate) {
+    const viewer = await getOptionalViewer(req);
+    const invited = viewer
+      ? await prisma.invitation.findFirst({
+          where: { eventId: event.id, guestEmail: viewer.email },
+        })
+      : null;
+    const isHost = viewer?.id === event.hostId;
+
+    if (!isHost && !invited) {
+      // Same 404 as a missing event, so the event's existence isn't revealed
+      return res.status(404).json({ error: "Event not found" });
+    }
+  }
+
+  const { _count, ...rest } = event;
   return res.status(200).json({
-    event: { ...details, seatsRemaining: event.capacity - _count.seats },
+    event: { ...rest, seatsRemaining: event.capacity - _count.seats },
   });
 });
 
@@ -179,7 +190,7 @@ eventsRouter.post("/:id/invitations", requireAuth, requireRole("HOST"), async (r
   }
 
   const event = await prisma.event.findUnique({
-    where: { id: req.params.id },
+    where: { id: String(req.params.id) },
     select: { id: true, hostId: true },
   });
 

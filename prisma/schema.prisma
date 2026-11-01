@@ -54,6 +54,7 @@ model Event {
 
   seats          Seat[]
   invitations    Invitation[]
+  isPrivate      Boolean  @default(false)
 
   @@index([hostId])       // Speeds up "find this host's events"
 }
