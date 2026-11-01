@@ -57,6 +57,28 @@ eventsRouter.get("/mine", requireAuth, requireRole("HOST"), async (req, res) => 
   return res.status(200).json({ events });
 });
 
+// GET /events
+// Public. Lists upcoming events with seats still available
+eventsRouter.get("/", async (_req, res) => {
+  const events = await prisma.event.findMany({
+    where: { startsAt: { gte: new Date() } }, // only events in the future
+    orderBy: { startsAt: "asc" },            // soonest first
+    include: {
+      _count: {
+        select: { seats: { where: { status: { in: ["CONFIRMED", "AWAITING_PAYMENT"] } } } },
+      },
+    },
+  });
+
+  // Work out seatsRemaining for each event and drop the raw count
+  const result = events.map(({ _count, ...event }) => ({
+    ...event,
+    seatsRemaining: event.capacity - _count.seats,
+  }));
+
+  return res.status(200).json({ events: result });
+});
+
 // GET /events/:id
 // Public. Anyone with the link can see the event's details.
 // ":id" is a route parameter: the value in the URL is available as req.params.id

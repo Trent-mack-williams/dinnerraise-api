@@ -10,7 +10,7 @@ import { webhooksRouter } from "./routes/webhooks";
 export function createApp() {
   const app = express();
 
-  app.use(cors({ origin: "http://localhost:3000" }));
+  app.use(cors({ origin: ["http://localhost:3000", "http://localhost:5173"] }));
   app.use("/webhooks", webhooksRouter);// Must come before express.json(), so the body arrives raw for signature checking
   app.use(express.json());
 
