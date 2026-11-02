@@ -54,8 +54,21 @@ eventsRouter.post("/", requireAuth, requireRole("HOST"), async (req, res) => {
 // Must sit above "/:id" so Express doesn't read "mine" as an id
 eventsRouter.get("/mine", requireAuth, requireRole("HOST"), async (req, res) => {
   const events = await prisma.event.findMany({
-    where: { hostId: req.user!.id },   // Filter to this host only
-    orderBy: { startsAt: "asc" },      // Soonest event first
+    where: { hostId: req.user!.id },
+    orderBy: { startsAt: "asc" },
+    include: {
+      seats: {
+        where: { status: { in: ["PENDING", "AWAITING_PAYMENT", "CONFIRMED"] } },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          guestName: true,
+          guestEmail: true,
+          dietaryRestrictions: true,
+          status: true,
+        },
+      },
+    },
   });
 
   return res.status(200).json({ events });
