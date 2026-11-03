@@ -225,7 +225,8 @@ eventsRouter.post("/:id/invitations", requireAuth, requireRole("HOST"), async (r
     data: { eventId: event.id, guestEmail: parsed.data.guestEmail, token },
   });
 
-  const link = `http://localhost:3000/invite/${invitation.token}`;
+  // The page the guest opens. The event id and the secret code are both needed
+  const link = `http://localhost:5173/events/${event.id}?invite=${invitation.token}`;
   return res.status(201).json({
     invitation: { id: invitation.id, guestEmail: invitation.guestEmail, token: invitation.token, link },
   });
