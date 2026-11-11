@@ -77,8 +77,8 @@ invitationsRouter.post("/:token/confirm", async (req, res) => {
         },
       ],
       metadata: { seatId: seat.id },
-      success_url: "http://localhost:3000/payment/success",
-      cancel_url: "http://localhost:3000/payment/cancelled",
+      success_url: `http://localhost:5173/events/${seat.eventId}`,
+      cancel_url: `http://localhost:5173/events/${seat.eventId}`,
     });
 
     await prisma.seat.update({

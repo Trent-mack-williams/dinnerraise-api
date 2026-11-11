@@ -57,3 +57,18 @@ seatsRouter.patch("/:seatId", requireAuth, requireRole("HOST"), async (req, res)
     return res.status(500).json({ error: "Something went wrong" });
   }
 });
+
+// GET /seats/:seatId
+// Public. Returns only what a guest needs to see where their request stands
+seatsRouter.get("/:seatId", async (req, res) => {
+  const seat = await prisma.seat.findUnique({
+    where: { id: String(req.params.seatId) },
+    select: { id: true, eventId: true, guestName: true, status: true },
+  });
+
+  if (!seat) {
+    return res.status(404).json({ error: "Seat not found" });
+  }
+
+  return res.status(200).json({ seat });
+});
