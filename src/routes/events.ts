@@ -6,6 +6,7 @@ import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
 import { getOptionalViewer } from "../lib/viewer";
 import { env } from "../config/env";
+import { stripe } from "../lib/stripe";
 
 export const eventsRouter = Router();
 
@@ -232,4 +233,75 @@ eventsRouter.post("/:id/invitations", requireAuth, requireRole("HOST"), async (r
     invitation: { id: invitation.id, guestEmail: invitation.guestEmail, token: invitation.token, link },
   });
   
+});
+
+// POST /events/:id/cancel
+// Host-only. Cancels the dinner, refunds paid seats, and cancels unpaid ones
+eventsRouter.post("/:id/cancel", requireAuth, requireRole("HOST"), async (req, res) => {
+  const eventId = String(req.params.id);
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true, hostId: true, cancelledAt: true },
+  });
+
+  if (!event) {
+    return res.status(404).json({ error: "Event not found" });
+  }
+  // Ownership check, as with approvals and invites
+  if (event.hostId !== req.user!.id) {
+    return res.status(403).json({ error: "You can only cancel your own dinners" });
+  }
+  // Cancelling twice would refund twice, so stop here
+  if (event.cancelledAt) {
+    return res.status(409).json({ error: "This dinner is already cancelled" });
+  }
+
+  // Step 1: stop new bookings and payments before touching any money
+  await prisma.event.update({
+    where: { id: eventId },
+    data: { cancelledAt: new Date() },
+  });
+
+  // Step 2: cancel seats that were never paid. Their checkout links stop being useful
+  await prisma.seat.updateMany({
+    where: { eventId, status: "AWAITING_PAYMENT" },
+    data: { status: "CANCELLED" },
+  });
+
+  // Step 3: refund each paid seat. Keep going if one fails, and record which ones did
+  const paidSeats = await prisma.seat.findMany({
+    where: { eventId, status: "CONFIRMED" },
+    select: { id: true, guestEmail: true, stripePaymentIntentId: true },
+  });
+
+  const failedRefunds: { seatId: string; guestEmail: string; reason: string }[] = [];
+  let refunded = 0;
+
+  for (const seat of paidSeats) {
+    if (!seat.stripePaymentIntentId) {
+      failedRefunds.push({
+        seatId: seat.id,
+        guestEmail: seat.guestEmail,
+        reason: "No payment reference saved. Refund manually in Stripe",
+      });
+      continue;
+    }
+    try {
+      await stripe.refunds.create({ payment_intent: seat.stripePaymentIntentId });
+      await prisma.seat.update({
+        where: { id: seat.id },
+        data: { status: "CANCELLED" },
+      });
+      refunded++;
+    } catch (err) {
+      failedRefunds.push({
+        seatId: seat.id,
+        guestEmail: seat.guestEmail,
+        reason: err instanceof Error ? err.message : "Refund failed",
+      });
+    }
+  }
+
+  return res.status(200).json({ cancelled: true, refunded, failedRefunds });
 });
