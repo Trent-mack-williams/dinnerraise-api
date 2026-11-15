@@ -51,10 +51,11 @@ model Event {
   seatPriceCents Int      // Money in whole pence/cents. £19.99 is stored as 1999
   capacity       Int      // Maximum number of seats
   createdAt      DateTime @default(now())
-
+  cancelledAt    DateTime?   // Set when the host cancels. Null means the dinner is still on
   seats          Seat[]
   invitations    Invitation[]
   isPrivate      Boolean  @default(false)
+
 
   @@index([hostId])       // Speeds up "find this host's events"
 }
