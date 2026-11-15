@@ -22,7 +22,7 @@ seatsRouter.patch("/:seatId", requireAuth, requireRole("HOST"), async (req, res)
   try {
     const seat = await prisma.$transaction(async (tx) => {
       const existing = await tx.seat.findUnique({
-        where: { id: req.params.seatId },
+         where: { id: String(req.params.seatId) },
         include: { event: { select: { hostId: true, capacity: true } } },
       });
 

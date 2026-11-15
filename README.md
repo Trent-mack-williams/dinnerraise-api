@@ -224,4 +224,4 @@ MIT
 
 ## Author
 
-[Trent Williams](https://github.com/Trent-mack-williams) — London-based developer building portfolio projects for remote work in fintech and payments.
+[Trent Williams](https://github.com/Trent-mack-williams) — London-based developer building portfolio projects for remote work

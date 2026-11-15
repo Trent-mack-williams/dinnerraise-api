@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
 import { getOptionalViewer } from "../lib/viewer";
+import { env } from "../config/env";
 
 export const eventsRouter = Router();
 
@@ -226,7 +227,7 @@ eventsRouter.post("/:id/invitations", requireAuth, requireRole("HOST"), async (r
   });
 
   // The page the guest opens. The event id and the secret code are both needed
-  const link = `http://localhost:5173/events/${event.id}?invite=${invitation.token}`;
+  const link = `${env.FRONTEND_URL}/events/${event.id}?invite=${invitation.token}`;
   return res.status(201).json({
     invitation: { id: invitation.id, guestEmail: invitation.guestEmail, token: invitation.token, link },
   });

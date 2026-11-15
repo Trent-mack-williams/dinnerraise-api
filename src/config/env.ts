@@ -10,6 +10,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(4000),  // .env values are text; coerce turns "4000" into the number 4000
   STRIPE_SECRET_KEY: z.string().startsWith("sk_test_", "Use a test key (sk_test_...) while developing"),
   STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_", "Webhook secret must start with whsec_"),
+  FRONTEND_URL: z.string().url(),
 });
 
 // Checks process.env against the schema and throws if anything is wrong.

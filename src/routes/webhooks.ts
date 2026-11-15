@@ -28,11 +28,17 @@ webhooksRouter.post("/stripe", raw({ type: "application/json" }), async (req, re
     const seatId = session.metadata?.seatId;
 
     if (seatId) {
+
+      // Stripe returns the payment intent id on the completed session.
+      // A refund needs this id later, so save it with the seat
+      const paymentIntentId =
+        typeof session.payment_intent === "string" ? session.payment_intent : null;
+
       // updateMany only matches seats still awaiting payment.
       // If Stripe retries this event, the second run matches nothing and changes nothing
       await prisma.seat.updateMany({
         where: { id: seatId, status: "AWAITING_PAYMENT" },
-        data: { status: "CONFIRMED" },
+        data: { status: "CONFIRMED", stripePaymentIntentId: paymentIntentId },
       });
     }
   }
@@ -43,10 +49,14 @@ webhooksRouter.post("/stripe", raw({ type: "application/json" }), async (req, re
     const seatId = session.metadata?.seatId;
 
     if (seatId) {
-      // Cancel the seat, freeing its place. If it's already CONFIRMED, don't touch it
+      // Stripe returns the payment intent id on the completed session.
+      // A refund needs this id later, so save it with the seat
+      const paymentIntentId =
+        typeof session.payment_intent === "string" ? session.payment_intent : null;
+
       await prisma.seat.updateMany({
         where: { id: seatId, status: "AWAITING_PAYMENT" },
-        data: { status: "CANCELLED" },
+        data: { status: "CONFIRMED", stripePaymentIntentId: paymentIntentId },
       });
     }
   }
